@@ -1,0 +1,73 @@
+version: 0.25.{build}
+image: Visual Studio 2017
+
+
+environment:
+  matrix:
+  - PlatformToolset: v141_xp
+    PLATFORM: x64
+
+  - PlatformToolset: v141_xp
+    PLATFORM: Win32
+
+configuration:
+    - Release Unicode
+    - Debug Unicode
+
+install:
+
+    - if "%platform%"=="x64" set archi=amd64
+    - if "%platform%"=="x64" set platform_input=x64
+
+    - if "%platform%"=="Win32" set archi=x86
+    - if "%platform%"=="Win32" set platform_input=Win32
+
+    - if "%PlatformToolset%"=="v141_xp" call "C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\VC\Auxiliary\Build\vcvarsall.bat" %archi%
+    - if "%PlatformToolset%"=="v140_xp" call "C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\vcvarsall.bat" %archi%
+
+build_script:
+    - cd "%APPVEYOR_BUILD_FOLDER%"/VS2017
+    - msbuild TextFX.vcxproj /p:configuration="%configuration%" /p:platform="%platform_input%" /p:PlatformToolset="%PlatformToolset%" /logger:"C:\Program Files\AppVeyor\BuildAgent\Appveyor.MSBuildLogger.dll"
+
+after_build:
+    - cd "%APPVEYOR_BUILD_FOLDER%"/VS2017
+    - ps: >-
+
+        if(-not ($env:PYTHONTEST))
+        {
+            if ($env:PLATFORM_INPUT -eq "x64" -and $env:CONFIGURATION -eq "Release Unicode") {
+                Push-AppveyorArtifact "$env:PLATFORM_INPUT\NppTextFX.dll" -FileName NppTextFX.dll
+            }
+
+            if ($env:PLATFORM_INPUT -eq "Win32" -and $env:CONFIGURATION -eq "Release Unicode") {
+                Push-AppveyorArtifact "NppTextFX.dll" -FileName NppTextFX.dll
+            }
+
+            if ($($env:APPVEYOR_REPO_TAG) -eq "true" -and $env:CONFIGURATION -eq "Release Unicode" -and $env:PLATFORMTOOLSET -eq "v141_xp") {
+                if($env:PLATFORM_INPUT -eq "x64"){
+                    $ZipFileName = "NppTextFX_$($env:APPVEYOR_REPO_TAG_NAME)_x64.zip"
+                    7z a $ZipFileName $env:PLATFORM_INPUT\*.dll
+                }
+                if($env:PLATFORM_INPUT -eq "Win32"){
+                    $ZipFileName = "NppTextFX_$($env:APPVEYOR_REPO_TAG_NAME)_x86.zip"
+                    7z a $ZipFileName bin\*.dll
+                }
+            }
+        }
+
+# artifacts:
+  # - path: NppTextFX_*.zip
+    # name: releases
+
+# deploy:
+    # provider: GitHub
+    # auth_token:
+        # secure: !!TODO, see https://www.appveyor.com/docs/deployment/github/#provider-settings!!
+    # artifact: releases
+    # draft: false
+    # prerelease: false
+    # force_update: true
+    # on:
+        # appveyor_repo_tag: true
+        # PlatformToolset: v141_xp
+        # configuration: Release Unicode
